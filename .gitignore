@@ -15,12 +15,6 @@ coverage/
 
 # Local runtime/cache files
 .env
-.strapi/
-.strapi-updater.json
-.tmp/
-.npm/
-.npm-cache/
-Library/
 
 # Editor/OS
 .DS_Store
