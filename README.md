@@ -1,61 +1,52 @@
-# 🚀 Getting started with Strapi
+# strapi-dz-component-duplicator
 
-Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.
+A Strapi 5 admin plugin that adds a **Duplicate** button to every dynamic zone block in the Content Manager edit view, so editors can clone a block in one click and then tweak only what changes.
 
-### `develop`
+## What it does
 
-Start your Strapi application with autoReload enabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-develop)
+In content types that use [dynamic zones](https://docs.strapi.io/dev-docs/backend-customization/models#dynamic-zones), each block (e.g. a "Quote", "Image", or "CTA" component) gets an action row with delete, drag, and more actions. This plugin injects a **Duplicate** action in that same row.
 
-```
-npm run develop
+- **One-click clone** — Duplicate creates a full copy of the block (including nested components and media references) and inserts it right after the current block.
+- **Clean copy** — Transient fields like `id`, `documentId`, and `__temp_key__` are stripped so Strapi treats the duplicate as a new entry.
+- **No extra steps** — Works in the existing edit view; no new screens or modals.
+
+Useful when you have several similar blocks (e.g. multiple testimonials or CTAs): duplicate once, then change only the differing fields instead of re-adding the component and re-entering everything.
+
+![Dynamic zone duplicate](assets/dynamicZoneDuplicate.png)
+
+![Dynamic zone duplicate close-up](assets/dynamicZoneDuplicateCloseUp.png)
+
+## Install
+
+```bash
+npm install strapi-dz-component-duplicator
 # or
-yarn develop
-```
-
-### `start`
-
-Start your Strapi application with autoReload disabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-start)
-
-```
-npm run start
+pnpm add strapi-dz-component-duplicator
 # or
-yarn start
+yarn add strapi-dz-component-duplicator
 ```
 
-### `build`
+Enable in `config/plugins.ts`:
 
-Build your admin panel. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-build)
-
+```ts
+export default () => ({
+  'strapi-dz-component-duplicator': {
+    enabled: true,
+  },
+});
 ```
+
+Then rebuild admin:
+
+```bash
 npm run build
 # or
-yarn build
+npm run develop
 ```
 
-## ⚙️ Deployment
+The Duplicate button only appears on edit views for content types that have at least one dynamic zone field. If you don’t see it, confirm the plugin is enabled, the admin was rebuilt after installing, and you’re editing an entry whose content type uses a dynamic zone.
 
-Strapi gives you many possible deployment options for your project including [Strapi Cloud](https://cloud.strapi.io). Browse the [deployment section of the documentation](https://docs.strapi.io/dev-docs/deployment) to find the best solution for your use case.
+## Compatibility
 
-```
-yarn strapi deploy
-```
-
-## 📚 Learn more
-
-- [Resource center](https://strapi.io/resource-center) - Strapi resource center.
-- [Strapi documentation](https://docs.strapi.io) - Official Strapi documentation.
-- [Strapi tutorials](https://strapi.io/tutorials) - List of tutorials made by the core team and the community.
-- [Strapi blog](https://strapi.io/blog) - Official Strapi blog containing articles made by the Strapi team and the community.
-- [Changelog](https://strapi.io/changelog) - Find out about the Strapi product updates, new features and general improvements.
-
-Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/strapi). Your feedback and contributions are welcome!
-
-## ✨ Community
-
-- [Discord](https://discord.strapi.io) - Come chat with the Strapi community including the core team.
-- [Forum](https://forum.strapi.io/) - Place to discuss, ask questions and find answers, show your Strapi project and get feedback or just talk with other Community members.
-- [Awesome Strapi](https://github.com/strapi/awesome-strapi) - A curated list of awesome things related to Strapi.
-
----
-
-<sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
+- Strapi: `^5.0.0`
+- Node: `>=20.0.0 <=24.x.x`
