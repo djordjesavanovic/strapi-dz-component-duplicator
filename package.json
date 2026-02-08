@@ -1,6 +1,6 @@
 {
   "name": "strapi-dz-component-duplicator",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Duplicate dynamic zone components directly from Strapi 5 edit view.",
   "author": "Djordje Savanovic",
   "keywords": [
