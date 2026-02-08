@@ -78,12 +78,22 @@ const cloneValue = (value) => {
   return JSON.parse(JSON.stringify(value));
 };
 
+const isMediaObject = (value) => {
+  return isPlainObject(value) && typeof value.mime === 'string';
+};
+
 const stripTransientKeys = (value) => {
   if (Array.isArray(value)) {
     return value.map(stripTransientKeys);
   }
 
   if (!isPlainObject(value)) {
+    return value;
+  }
+
+  // Media references must keep their id/documentId so Strapi can
+  // maintain the relation on save.
+  if (isMediaObject(value)) {
     return value;
   }
 
@@ -107,10 +117,20 @@ const getActionAnchor = (listItem) => {
     return null;
   }
 
+  // Dynamic zone headers include a drag handle, a delete button, and a
+  // more-actions menu.  We look for the drag button by its aria-label and
+  // fall back to verifying that at least three buttons exist (the minimum
+  // for a dynamic zone header as of Strapi 5).
+  const dragButton =
+    header.querySelector('button[aria-label="Drag"]') ||
+    header.querySelector('button[aria-label="drag"]');
+
+  if (dragButton) {
+    return dragButton;
+  }
+
   const buttons = header.querySelectorAll('button');
 
-  // Dynamic zone headers include delete, drag and more-actions controls.
-  // Repeatable components usually don't include the extra menu action.
   if (buttons.length < 3) {
     return null;
   }
@@ -214,7 +234,7 @@ const findDynamicZoneLocation = (listItem, values, components) => {
   return findDynamicZoneLocationFromList(listItem, values, components);
 };
 
-const createDuplicateButton = (anchor, label, onClick) => {
+const createDuplicateButton = (anchor, label, onClick, signal) => {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = anchor.className;
@@ -248,7 +268,7 @@ const createDuplicateButton = (anchor, label, onClick) => {
     event.preventDefault();
     event.stopPropagation();
     onClick();
-  });
+  }, { signal });
 
   return button;
 };
@@ -258,9 +278,13 @@ const DynamicZoneActionInjector = () => {
   const { toggleNotification } = useNotification();
   const { form, isLoading, components } = useContentManagerContext();
 
+  const isBrowser = typeof document !== 'undefined';
+
   const values = form?.values;
   const valuesRef = React.useRef(values);
   const observerRef = React.useRef(null);
+  const frameRef = React.useRef(0);
+  const abortRef = React.useRef(null);
 
   valuesRef.current = values;
 
@@ -275,8 +299,9 @@ const DynamicZoneActionInjector = () => {
   });
 
   const cleanupInjectedButtons = React.useCallback(() => {
-    if (typeof document === 'undefined') {
-      return;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
     }
 
     const injectedNodes = document.querySelectorAll(`[${DUPLICATE_CONTAINER_ATTR}]`);
@@ -311,7 +336,7 @@ const DynamicZoneActionInjector = () => {
   );
 
   const injectButtons = React.useCallback(() => {
-    if (typeof document === 'undefined') {
+    if (!isBrowser) {
       return;
     }
 
@@ -336,6 +361,9 @@ const DynamicZoneActionInjector = () => {
       return;
     }
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const listItems = document.querySelectorAll('ol > li');
 
     for (const listItem of listItems) {
@@ -353,7 +381,7 @@ const DynamicZoneActionInjector = () => {
 
       const duplicateButton = createDuplicateButton(anchor, duplicateLabel, () => {
         handleDuplicate(location.dynamicZonePath, location.index);
-      });
+      }, controller.signal);
       anchor.parentElement.insertBefore(
         duplicateButton,
         anchor
@@ -366,15 +394,16 @@ const DynamicZoneActionInjector = () => {
         subtree: true,
       });
     }
-  }, [cleanupInjectedButtons, duplicateLabel, handleDuplicate, isLoading]);
+  }, [cleanupInjectedButtons, components, duplicateLabel, handleDuplicate, isBrowser, isLoading]);
 
   React.useEffect(() => {
-    if (typeof document === 'undefined') {
+    if (!isBrowser) {
       return undefined;
     }
 
     const observer = new MutationObserver(() => {
-      injectButtons();
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = requestAnimationFrame(() => injectButtons());
     });
 
     observerRef.current = observer;
@@ -387,15 +416,12 @@ const DynamicZoneActionInjector = () => {
     injectButtons();
 
     return () => {
+      cancelAnimationFrame(frameRef.current);
       observer.disconnect();
       observerRef.current = null;
       cleanupInjectedButtons();
     };
-  }, [cleanupInjectedButtons, injectButtons]);
-
-  React.useEffect(() => {
-    injectButtons();
-  }, [injectButtons, values]);
+  }, [cleanupInjectedButtons, isBrowser, injectButtons]);
 
   return null;
 };

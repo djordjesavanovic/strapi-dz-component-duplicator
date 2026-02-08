@@ -47,10 +47,6 @@
     "@strapi/strapi": "^5.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "react-router-dom": "^6.0.0",
-    "styled-components": "^6.0.0"
-  },
-  "dependencies": {
     "react-intl": "^7.0.0"
   },
   "strapi": {
