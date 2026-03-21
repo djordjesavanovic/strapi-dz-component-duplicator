@@ -373,9 +373,7 @@ const toRelationConnectEntry = (relation, attribute, contentTypes, createTempKey
     __temp_key__: createTempKey(),
     apiData: {
       id,
-      documentId: documentId ?? '',
       locale,
-      isTemporary: relation.apiData?.isTemporary ?? true,
     },
   };
 
@@ -469,7 +467,7 @@ const sanitizeComponentValue = async ({
   const next = {};
 
   for (const [fieldName, attribute] of Object.entries(attributes)) {
-    if (!(fieldName in value)) {
+    if (fieldName === 'id' || !(fieldName in value)) {
       continue;
     }
 
