@@ -373,9 +373,7 @@ const toRelationConnectEntry = (relation, attribute, contentTypes, createTempKey
     __temp_key__: createTempKey(),
     apiData: {
       id,
-      documentId: documentId ?? '',
       locale,
-      isTemporary: relation.apiData?.isTemporary ?? true,
     },
   };
 
@@ -469,7 +467,7 @@ const sanitizeComponentValue = async ({
   const next = {};
 
   for (const [fieldName, attribute] of Object.entries(attributes)) {
-    if (!(fieldName in value)) {
+    if (fieldName === 'id' || !(fieldName in value)) {
       continue;
     }
 
@@ -781,6 +779,13 @@ const DynamicZoneActionInjector = () => {
         if (!isDynamicZoneItem(cloned)) {
           throw new Error('Invalid dynamic zone clone');
         }
+
+        console.group('[DZ-Duplicator] Duplicate Debug');
+        console.log('Original item:', JSON.parse(JSON.stringify(item)));
+        console.log('Cloned item (before addFieldRow):', JSON.parse(JSON.stringify(cloned)));
+        console.log('Inserting at path:', dynamicZonePath, 'position:', index + 1);
+        console.log('Current DZ length:', getIn(valuesRef.current, dynamicZonePath)?.length);
+        console.groupEnd();
 
         form.addFieldRow(dynamicZonePath, cloned, index + 1);
       } catch {
