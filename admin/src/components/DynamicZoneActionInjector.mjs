@@ -780,13 +780,6 @@ const DynamicZoneActionInjector = () => {
           throw new Error('Invalid dynamic zone clone');
         }
 
-        console.group('[DZ-Duplicator] Duplicate Debug');
-        console.log('Original item:', JSON.parse(JSON.stringify(item)));
-        console.log('Cloned item (before addFieldRow):', JSON.parse(JSON.stringify(cloned)));
-        console.log('Inserting at path:', dynamicZonePath, 'position:', index + 1);
-        console.log('Current DZ length:', getIn(valuesRef.current, dynamicZonePath)?.length);
-        console.groupEnd();
-
         form.addFieldRow(dynamicZonePath, cloned, index + 1);
       } catch {
         toggleNotification({
