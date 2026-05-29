@@ -780,7 +780,27 @@ const DynamicZoneActionInjector = () => {
           throw new Error('Invalid dynamic zone clone');
         }
 
-        form.addFieldRow(dynamicZonePath, cloned, index + 1);
+        const currentZone = getIn(valuesRef.current, dynamicZonePath);
+
+        if (!Array.isArray(currentZone)) {
+          throw new Error('Dynamic zone not found');
+        }
+
+        // Strapi 5.0.0–5.8.0 had a bug where addFieldRow(field, value, addAtIndex)
+        // overwrote the item at `addAtIndex` instead of inserting before it
+        // (fixed upstream in PR #22656, shipped in 5.8.1). Append-then-move avoids
+        // that codepath entirely so the plugin works on every Strapi 5.
+        const targetIndex = index + 1;
+        const appendedIndex = currentZone.length;
+
+        form.addFieldRow(dynamicZonePath, cloned);
+
+        if (
+          appendedIndex !== targetIndex &&
+          typeof form.moveFieldRow === 'function'
+        ) {
+          form.moveFieldRow(dynamicZonePath, appendedIndex, targetIndex);
+        }
       } catch {
         toggleNotification({
           type: 'danger',
