@@ -94,14 +94,34 @@ const cloneValue = (value) => {
   return JSON.parse(JSON.stringify(value));
 };
 
-const createTempKeyFactory = () => {
-  let counter = 0;
-  const seed =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+// Strapi treats __temp_key__ as a fractional-indexing order key, so keys must be valid and
+// ascending within each array. Same output as generateNKeysBetween(null, null, n):
+// a0…az, b00…bzz, c000… (the head letter encodes the integer length).
+const ORDER_KEY_DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-  return () => `${String(counter++).padStart(4, '0')}-${seed}`;
+const orderKeyAt = (index) => {
+  let length = 1;
+  let rest = index;
+
+  while (rest >= ORDER_KEY_DIGITS.length ** length) {
+    rest -= ORDER_KEY_DIGITS.length ** length;
+    length += 1;
+  }
+
+  let body = '';
+
+  for (let digit = 0; digit < length; digit += 1) {
+    body = ORDER_KEY_DIGITS[rest % ORDER_KEY_DIGITS.length] + body;
+    rest = Math.floor(rest / ORDER_KEY_DIGITS.length);
+  }
+
+  return String.fromCharCode('a'.charCodeAt(0) + length - 1) + body;
+};
+
+const withOrderKeys = (items) => {
+  return items.map((item, index) =>
+    isPlainObject(item) ? { ...item, __temp_key__: orderKeyAt(index) } : item
+  );
 };
 
 const getActionAnchor = (listItem) => {
@@ -354,7 +374,7 @@ const normalizeFetchedRelations = (value) => {
   return [];
 };
 
-const toRelationConnectEntry = (relation, attribute, contentTypes, createTempKey) => {
+const toRelationConnectEntry = (relation, attribute, contentTypes) => {
   if (!isPlainObject(relation)) {
     return null;
   }
@@ -370,7 +390,6 @@ const toRelationConnectEntry = (relation, attribute, contentTypes, createTempKey
     locale,
     href,
     label: label || documentId || (id !== undefined && id !== null ? String(id) : ''),
-    __temp_key__: createTempKey(),
     apiData: {
       id,
       locale,
@@ -392,7 +411,6 @@ const sanitizeRelationValue = async ({
   sourceContext,
   fieldName,
   contentTypes,
-  createTempKey,
   fetchRelationItems,
 }) => {
   const currentConnect = Array.isArray(value?.connect) ? value.connect : [];
@@ -405,7 +423,7 @@ const sanitizeRelationValue = async ({
   const connectedByIdentity = new Map();
 
   for (const relation of currentConnect) {
-    const entry = toRelationConnectEntry(relation, attribute, contentTypes, createTempKey);
+    const entry = toRelationConnectEntry(relation, attribute, contentTypes);
     const identity = getRelationIdentity(entry);
 
     if (entry && identity) {
@@ -420,7 +438,7 @@ const sanitizeRelationValue = async ({
   const effectiveRelations = [];
 
   for (const relation of fetchedRelations) {
-    const entry = toRelationConnectEntry(relation, attribute, contentTypes, createTempKey);
+    const entry = toRelationConnectEntry(relation, attribute, contentTypes);
     const identity = getRelationIdentity(entry);
 
     if (!entry || !identity || disconnectedIdentities.has(identity)) {
@@ -445,7 +463,7 @@ const sanitizeRelationValue = async ({
     : effectiveRelations;
 
   return {
-    connect,
+    connect: withOrderKeys(connect),
     disconnect: [],
   };
 };
@@ -455,7 +473,6 @@ const sanitizeComponentValue = async ({
   componentUid,
   components,
   contentTypes,
-  createTempKey,
   fetchRelationItems,
   sourceContext,
 }) => {
@@ -477,7 +494,6 @@ const sanitizeComponentValue = async ({
       value: value[fieldName],
       components,
       contentTypes,
-      createTempKey,
       fetchRelationItems,
       sourceContext: {
         model: componentUid,
@@ -493,7 +509,6 @@ const sanitizeDynamicZoneValue = async ({
   value,
   components,
   contentTypes,
-  createTempKey,
   fetchRelationItems,
 }) => {
   if (!isDynamicZoneItem(value)) {
@@ -506,7 +521,6 @@ const sanitizeDynamicZoneValue = async ({
     componentUid,
     components,
     contentTypes,
-    createTempKey,
     fetchRelationItems,
     sourceContext: {
       model: componentUid,
@@ -526,7 +540,6 @@ const sanitizeAttributeValue = async ({
   value,
   components,
   contentTypes,
-  createTempKey,
   fetchRelationItems,
   sourceContext,
 }) => {
@@ -547,7 +560,6 @@ const sanitizeAttributeValue = async ({
             componentUid: attribute.component,
             components,
             contentTypes,
-            createTempKey,
             fetchRelationItems,
             sourceContext: {
               model: attribute.component,
@@ -557,14 +569,7 @@ const sanitizeAttributeValue = async ({
         )
       );
 
-      return next.map((item) =>
-        isPlainObject(item)
-          ? {
-              ...item,
-              __temp_key__: createTempKey(),
-            }
-          : item
-      );
+      return withOrderKeys(next);
     }
 
     return sanitizeComponentValue({
@@ -572,7 +577,6 @@ const sanitizeAttributeValue = async ({
       componentUid: attribute.component,
       components,
       contentTypes,
-      createTempKey,
       fetchRelationItems,
       sourceContext: {
         model: attribute.component,
@@ -592,20 +596,12 @@ const sanitizeAttributeValue = async ({
           value: item,
           components,
           contentTypes,
-          createTempKey,
           fetchRelationItems,
         })
       )
     );
 
-    return next.map((item) =>
-      isPlainObject(item)
-        ? {
-            ...item,
-            __temp_key__: createTempKey(),
-          }
-        : item
-    );
+    return withOrderKeys(next);
   }
 
   if (attribute.type === 'relation') {
@@ -615,7 +611,6 @@ const sanitizeAttributeValue = async ({
       sourceContext,
       fieldName,
       contentTypes,
-      createTempKey,
       fetchRelationItems,
     });
   }
@@ -767,12 +762,10 @@ const DynamicZoneActionInjector = () => {
 
       try {
         relationCacheRef.current.clear();
-        const createTempKey = createTempKeyFactory();
         const cloned = await sanitizeDynamicZoneValue({
           value: item,
           components,
           contentTypes,
-          createTempKey,
           fetchRelationItems,
         });
 
